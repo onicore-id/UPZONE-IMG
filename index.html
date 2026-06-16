@@ -56,6 +56,33 @@
   }
   .logo span{color:var(--accent);}
   .logo-img{max-width:360px; width:100%; height:auto;}
+
+  .dashboard-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
+    gap:20px;
+    max-width:600px;
+    width:100%;
+  }
+  .dashboard-card{
+    padding:36px 24px;
+    text-align:center;
+    cursor:pointer;
+    transition:transform .15s, border-color .15s;
+  }
+  .dashboard-card:hover{
+    transform:translateY(-4px);
+    border-color:var(--accent);
+  }
+  .dashboard-icon{font-size:40px; margin-bottom:14px;}
+  .dashboard-title{
+    font-family:'Archivo Black', sans-serif;
+    font-size:18px;
+    letter-spacing:.5px;
+    margin-bottom:8px;
+    text-transform:uppercase;
+  }
+  .dashboard-desc{font-size:12px; color:var(--text-dim); line-height:1.5;}
   .server-time{
     margin-top:8px;
     font-size:13px;
@@ -312,6 +339,31 @@
   </div>
 </div>
 
+<!-- DASHBOARD SCREEN -->
+<div id="dashboard-screen" class="center-wrap hidden">
+  <div class="dashboard-grid">
+    <div class="glass dashboard-card" id="card-server-image">
+      <div class="dashboard-icon">🖼️</div>
+      <div class="dashboard-title">SERVER IMAGE</div>
+      <div class="dashboard-desc">Upload, kelola folder, dan ambil URL gambar kamu.</div>
+    </div>
+    <div class="glass dashboard-card" id="card-convert">
+      <div class="dashboard-icon">🔄</div>
+      <div class="dashboard-title">CONVERT</div>
+      <div class="dashboard-desc">Convert format gambar/file. Segera hadir.</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONVERT SCREEN (placeholder) -->
+<div id="convert-screen" class="center-wrap hidden">
+  <div class="glass auth-card" style="text-align:center;">
+    <h2>CONVERT</h2>
+    <p class="sub">Fitur ini masih dalam pengembangan. Segera hadir.</p>
+    <button class="btn btn-ghost" id="btn-convert-back">← Kembali ke Dashboard</button>
+  </div>
+</div>
+
 <!-- TOKEN / REPO SETUP SCREEN -->
 <div id="setup-screen" class="center-wrap hidden">
   <div class="glass auth-card">
@@ -346,6 +398,7 @@
     <div class="toolbar-actions">
       <button class="btn btn-ghost" id="btn-new-folder">+ Folder Baru</button>
       <button class="btn btn-ghost" id="btn-pick-upload">Upload Gambar</button>
+      <span class="logout-link" id="btn-to-dashboard">Dashboard</span>
       <span class="logout-link" id="btn-logout">Keluar</span>
     </div>
   </div>
@@ -451,6 +504,22 @@ $("btn-login").addEventListener("click", async ()=>{
 
 function afterLogin(){
   $("login-screen").classList.add("hidden");
+  showDashboard();
+}
+
+function hideAllScreens(){
+  ["dashboard-screen","convert-screen","setup-screen","app-screen"].forEach(id=>{
+    $(id).classList.add("hidden");
+  });
+}
+
+function showDashboard(){
+  hideAllScreens();
+  $("dashboard-screen").classList.remove("hidden");
+}
+
+function openServerImage(){
+  hideAllScreens();
   const saved = localStorage.getItem(LS_CONFIG);
   if(saved){
     cfg = JSON.parse(saved);
@@ -459,6 +528,16 @@ function afterLogin(){
     $("setup-screen").classList.remove("hidden");
   }
 }
+
+function openConvert(){
+  hideAllScreens();
+  $("convert-screen").classList.remove("hidden");
+}
+
+$("card-server-image").addEventListener("click", openServerImage);
+$("card-convert").addEventListener("click", openConvert);
+$("btn-convert-back").addEventListener("click", showDashboard);
+$("btn-to-dashboard").addEventListener("click", showDashboard);
 
 $("btn-save-setup").addEventListener("click", ()=>{
   const owner = $("setup-owner").value.trim();
