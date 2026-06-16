@@ -83,6 +83,46 @@
     text-transform:uppercase;
   }
   .dashboard-desc{font-size:12px; color:var(--text-dim); line-height:1.5;}
+
+  #convert-list{display:flex; flex-direction:column; gap:12px;}
+  .convert-row{
+    display:flex; align-items:center; gap:14px;
+    padding:14px 16px;
+    flex-wrap:wrap;
+  }
+  .convert-thumb{
+    width:48px; height:48px; border-radius:10px;
+    background:rgba(255,255,255,.04);
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden; flex-shrink:0; font-size:20px;
+  }
+  .convert-thumb img{width:100%; height:100%; object-fit:cover;}
+  .convert-info{flex:1; min-width:120px;}
+  .convert-name{font-size:13px; font-weight:600; word-break:break-word;}
+  .convert-size{font-size:11px; color:var(--text-dim); margin-top:2px;}
+  .convert-format{
+    padding:9px 12px;
+    border-radius:10px;
+    border:1px solid var(--border);
+    background:rgba(255,255,255,.03);
+    color:var(--text);
+    font-size:13px;
+    outline:none;
+  }
+  .convert-format:focus{border-color:var(--accent);}
+  .convert-actions{display:flex; gap:8px; align-items:center;}
+  .convert-badge{
+    font-size:11px; padding:4px 10px; border-radius:20px;
+    border:1px solid var(--accent); color:var(--accent);
+  }
+  .btn-download{
+    background:var(--accent); color:#0a0a0a;
+  }
+  .convert-remove{
+    background:transparent; border:none; color:var(--text-dim);
+    cursor:pointer; font-size:16px; padding:4px 8px;
+  }
+  .convert-remove:hover{color:var(--danger);}
   .server-time{
     margin-top:8px;
     font-size:13px;
@@ -355,13 +395,24 @@
   </div>
 </div>
 
-<!-- CONVERT SCREEN (placeholder) -->
-<div id="convert-screen" class="center-wrap hidden">
-  <div class="glass auth-card" style="text-align:center;">
-    <h2>CONVERT</h2>
-    <p class="sub">Fitur ini masih dalam pengembangan. Segera hadir.</p>
-    <button class="btn btn-ghost" id="btn-convert-back">← Kembali ke Dashboard</button>
+<!-- CONVERT SCREEN -->
+<div id="convert-screen" class="hidden app-wrap">
+  <div class="glass toolbar">
+    <div class="breadcrumb"><span class="current">CONVERT GAMBAR</span></div>
+    <div class="toolbar-actions">
+      <button class="btn btn-ghost" id="btn-convert-pick">+ Pilih Gambar</button>
+      <span class="logout-link" id="btn-convert-to-dashboard">Dashboard</span>
+    </div>
   </div>
+
+  <input type="file" id="convert-file-input" accept="image/*" multiple class="hidden">
+
+  <div class="dropzone glass" id="convert-dropzone">
+    Tarik & lepas gambar di sini, atau klik "Pilih Gambar". Target format: PNG, JPEG, WEBP, BMP, ICO.
+  </div>
+
+  <div id="convert-list"></div>
+  <div class="empty-state hidden" id="convert-empty">Belum ada gambar dipilih.</div>
 </div>
 
 <!-- TOKEN / REPO SETUP SCREEN -->
@@ -536,7 +587,7 @@ function openConvert(){
 
 $("card-server-image").addEventListener("click", openServerImage);
 $("card-convert").addEventListener("click", openConvert);
-$("btn-convert-back").addEventListener("click", showDashboard);
+$("btn-convert-to-dashboard").addEventListener("click", showDashboard);
 $("btn-to-dashboard").addEventListener("click", showDashboard);
 
 $("btn-save-setup").addEventListener("click", ()=>{
@@ -905,6 +956,229 @@ async function handleFiles(fileList){
   }
   showToast("Upload selesai.");
   renderFolder(currentPath);
+}
+
+/* ====================== CONVERT ====================== */
+let convertItems = [];
+let convertCounter = 0;
+
+const CONVERT_FORMATS = [
+  { label:"PNG", mime:"image/png", ext:"png" },
+  { label:"JPEG", mime:"image/jpeg", ext:"jpg" },
+  { label:"WEBP", mime:"image/webp", ext:"webp" },
+  { label:"BMP", mime:"image/bmp", ext:"bmp" },
+  { label:"ICO", mime:"image/x-icon", ext:"ico" }
+];
+
+function formatBytes(bytes){
+  if(bytes < 1024) return bytes + " B";
+  if(bytes < 1024*1024) return (bytes/1024).toFixed(1) + " KB";
+  return (bytes/1024/1024).toFixed(1) + " MB";
+}
+
+$("btn-convert-pick").addEventListener("click", ()=> $("convert-file-input").click());
+$("convert-file-input").addEventListener("change", (e)=> addConvertFiles(e.target.files));
+
+const convertDz = $("convert-dropzone");
+convertDz.addEventListener("dragover", (e)=>{ e.preventDefault(); convertDz.classList.add("drag"); });
+convertDz.addEventListener("dragleave", ()=> convertDz.classList.remove("drag"));
+convertDz.addEventListener("drop", (e)=>{
+  e.preventDefault();
+  convertDz.classList.remove("drag");
+  addConvertFiles(e.dataTransfer.files);
+});
+
+function addConvertFiles(fileList){
+  const files = Array.from(fileList).filter(f => f.type.startsWith("image/"));
+  for(const file of files){
+    convertItems.push({
+      id: ++convertCounter,
+      file,
+      targetExt: "png",
+      status: "ready",
+      resultBlob: null,
+      resultName: null
+    });
+  }
+  renderConvertList();
+}
+
+function renderConvertList(){
+  const list = $("convert-list");
+  list.innerHTML = "";
+  $("convert-empty").classList.toggle("hidden", convertItems.length > 0);
+
+  for(const item of convertItems){
+    const row = document.createElement("div");
+    row.className = "glass convert-row";
+    const url = URL.createObjectURL(item.file);
+
+    const formatOptions = CONVERT_FORMATS.map(f =>
+      `<option value="${f.ext}" ${f.ext === item.targetExt ? "selected" : ""}>${f.label}</option>`
+    ).join("");
+
+    let actionHtml;
+    if(item.status === "done"){
+      actionHtml = `<span class="convert-badge">JADI</span><button class="btn btn-download" data-action="download">Download</button>`;
+    } else if(item.status === "converting"){
+      actionHtml = `<span class="spinner"></span>`;
+    } else {
+      actionHtml = `<button class="btn btn-ghost" data-action="convert">Konversi</button>`;
+    }
+
+    row.innerHTML = `
+      <div class="convert-thumb"><img src="${url}" alt=""></div>
+      <div class="convert-info">
+        <div class="convert-name">${item.file.name}</div>
+        <div class="convert-size">${formatBytes(item.file.size)}${item.status === "done" ? " → " + formatBytes(item.resultBlob.size) : ""}</div>
+      </div>
+      <select class="convert-format" data-id="${item.id}">${formatOptions}</select>
+      <div class="convert-actions">${actionHtml}</div>
+      <button class="convert-remove" data-action="remove">✕</button>
+    `;
+
+    row.querySelector(".convert-format").addEventListener("change", (e)=>{
+      item.targetExt = e.target.value;
+      item.status = "ready";
+      item.resultBlob = null;
+    });
+
+    const actionBtn = row.querySelector('[data-action="convert"]');
+    if(actionBtn) actionBtn.addEventListener("click", ()=> runConvert(item));
+
+    const dlBtn = row.querySelector('[data-action="download"]');
+    if(dlBtn) dlBtn.addEventListener("click", ()=> downloadConvertResult(item));
+
+    row.querySelector('[data-action="remove"]').addEventListener("click", ()=>{
+      convertItems = convertItems.filter(i => i.id !== item.id);
+      renderConvertList();
+    });
+
+    list.appendChild(row);
+  }
+}
+
+function loadImage(file){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = ()=> resolve(img);
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function canvasFromImage(img){
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+  return canvas;
+}
+
+function canvasToBlob(canvas, mime){
+  return new Promise((resolve, reject)=>{
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Gagal encode " + mime)), mime, 0.92);
+  });
+}
+
+async function encodeBMP(canvas){
+  const w = canvas.width, h = canvas.height;
+  const ctx = canvas.getContext("2d");
+  const imgData = ctx.getImageData(0, 0, w, h).data;
+  const rowSize = Math.floor((w * 3 + 3) / 4) * 4;
+  const pixelArraySize = rowSize * h;
+  const fileSize = 54 + pixelArraySize;
+  const buffer = new ArrayBuffer(fileSize);
+  const view = new DataView(buffer);
+
+  view.setUint8(0, 0x42); view.setUint8(1, 0x4D);
+  view.setUint32(2, fileSize, true);
+  view.setUint32(6, 0, true);
+  view.setUint32(10, 54, true);
+  view.setUint32(14, 40, true);
+  view.setInt32(18, w, true);
+  view.setInt32(22, h, true);
+  view.setUint16(26, 1, true);
+  view.setUint16(28, 24, true);
+  view.setUint32(30, 0, true);
+  view.setUint32(34, pixelArraySize, true);
+  view.setInt32(38, 0, true);
+  view.setInt32(42, 0, true);
+  view.setUint32(46, 0, true);
+  view.setUint32(50, 0, true);
+
+  let offset = 54;
+  for(let y = h - 1; y >= 0; y--){
+    let rowOffset = offset;
+    for(let x = 0; x < w; x++){
+      const i = (y * w + x) * 4;
+      view.setUint8(rowOffset++, imgData[i+2]);
+      view.setUint8(rowOffset++, imgData[i+1]);
+      view.setUint8(rowOffset++, imgData[i]);
+    }
+    offset += rowSize;
+  }
+  return new Blob([buffer], { type:"image/bmp" });
+}
+
+async function encodeICO(canvas){
+  const pngBlob = await canvasToBlob(canvas, "image/png");
+  const pngBuf = await pngBlob.arrayBuffer();
+  const header = new ArrayBuffer(6 + 16);
+  const view = new DataView(header);
+  view.setUint16(0, 0, true);
+  view.setUint16(2, 1, true);
+  view.setUint16(4, 1, true);
+  const w = Math.min(canvas.width, 256), h = Math.min(canvas.height, 256);
+  view.setUint8(6, w === 256 ? 0 : w);
+  view.setUint8(7, h === 256 ? 0 : h);
+  view.setUint8(8, 0);
+  view.setUint8(9, 0);
+  view.setUint16(10, 1, true);
+  view.setUint16(12, 32, true);
+  view.setUint32(14, pngBuf.byteLength, true);
+  view.setUint32(18, 22, true);
+  return new Blob([header, pngBuf], { type:"image/x-icon" });
+}
+
+async function runConvert(item){
+  item.status = "converting";
+  renderConvertList();
+  try{
+    const img = await loadImage(item.file);
+    const canvas = canvasFromImage(img);
+    const format = CONVERT_FORMATS.find(f => f.ext === item.targetExt);
+
+    let blob;
+    if(format.ext === "bmp"){
+      blob = await encodeBMP(canvas);
+    } else if(format.ext === "ico"){
+      blob = await encodeICO(canvas);
+    } else {
+      blob = await canvasToBlob(canvas, format.mime);
+    }
+
+    const baseName = item.file.name.replace(/\.[^.]+$/, "");
+    item.resultBlob = blob;
+    item.resultName = `${baseName}.${format.ext}`;
+    item.status = "done";
+  } catch(e){
+    item.status = "ready";
+    showToast("Gagal convert: " + e.message);
+  }
+  renderConvertList();
+}
+
+function downloadConvertResult(item){
+  const url = URL.createObjectURL(item.resultBlob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = item.resultName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 1000);
 }
 </script>
 </body>
