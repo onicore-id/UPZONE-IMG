@@ -613,7 +613,8 @@ async function renameFolderRecursive(oldPath, newPath){
 /* ---------- App rendering ---------- */
 function startApp(){
   $("app-screen").classList.remove("hidden");
-  renderFolder("");
+  const initialPath = decodeURIComponent(location.hash.slice(1));
+  renderFolder(initialPath);
 }
 
 function buildBreadcrumb(path){
@@ -647,6 +648,7 @@ function buildBreadcrumb(path){
 
 async function renderFolder(path){
   currentPath = path;
+  location.hash = path ? encodeURIComponent(path) : "";
   buildBreadcrumb(path);
   const grid = $("grid");
   grid.innerHTML = `<div class="empty-state">Memuat...</div>`;
