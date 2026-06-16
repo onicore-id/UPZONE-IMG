@@ -104,12 +104,16 @@
     padding:9px 12px;
     border-radius:10px;
     border:1px solid var(--border);
-    background:rgba(255,255,255,.03);
+    background:#15151a;
     color:var(--text);
     font-size:13px;
     outline:none;
   }
   .convert-format:focus{border-color:var(--accent);}
+  .convert-format option{
+    background:#15151a;
+    color:var(--text);
+  }
   .convert-actions{display:flex; gap:8px; align-items:center;}
   .convert-badge{
     font-size:11px; padding:4px 10px; border-radius:20px;
@@ -967,7 +971,9 @@ const CONVERT_FORMATS = [
   { label:"JPEG", mime:"image/jpeg", ext:"jpg" },
   { label:"WEBP", mime:"image/webp", ext:"webp" },
   { label:"BMP", mime:"image/bmp", ext:"bmp" },
-  { label:"ICO", mime:"image/x-icon", ext:"ico" }
+  { label:"ICO", mime:"image/x-icon", ext:"ico" },
+  { label:"SVG", mime:"image/svg+xml", ext:"svg" },
+  { label:"TIFF", mime:"image/tiff", ext:"tiff" }
 ];
 
 function formatBytes(bytes){
@@ -1142,6 +1148,67 @@ async function encodeICO(canvas){
   return new Blob([header, pngBuf], { type:"image/x-icon" });
 }
 
+function blobToDataURL(blob){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function encodeSVG(canvas){
+  const pngBlob = await canvasToBlob(canvas, "image/png");
+  const dataUrl = await blobToDataURL(pngBlob);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}"><image width="${canvas.width}" height="${canvas.height}" href="${dataUrl}"/></svg>`;
+  return new Blob([svg], { type:"image/svg+xml" });
+}
+
+async function encodeTIFF(canvas){
+  const w = canvas.width, h = canvas.height;
+  const ctx = canvas.getContext("2d");
+  const imgData = ctx.getImageData(0, 0, w, h).data;
+  const pixelBytes = w * h * 3;
+  const headerSize = 8;
+  const ifdOffset = headerSize + pixelBytes;
+  const tagCount = 8;
+  const ifdSize = 2 + tagCount * 12 + 4;
+  const buffer = new ArrayBuffer(ifdOffset + ifdSize);
+  const view = new DataView(buffer);
+
+  view.setUint16(0, 0x4949, true);
+  view.setUint16(2, 42, true);
+  view.setUint32(4, ifdOffset, true);
+
+  let p = headerSize;
+  for(let i = 0; i < w * h; i++){
+    view.setUint8(p++, imgData[i*4]);
+    view.setUint8(p++, imgData[i*4+1]);
+    view.setUint8(p++, imgData[i*4+2]);
+  }
+
+  let off = ifdOffset;
+  view.setUint16(off, tagCount, true); off += 2;
+  function writeTag(tag, type, count, value){
+    view.setUint16(off, tag, true);
+    view.setUint16(off+2, type, true);
+    view.setUint32(off+4, count, true);
+    view.setUint32(off+8, value, true);
+    off += 12;
+  }
+  writeTag(256, 3, 1, w);
+  writeTag(257, 3, 1, h);
+  writeTag(258, 3, 1, 8);
+  writeTag(259, 3, 1, 1);
+  writeTag(262, 3, 1, 2);
+  writeTag(273, 4, 1, headerSize);
+  writeTag(277, 3, 1, 3);
+  writeTag(279, 4, 1, pixelBytes);
+  view.setUint32(off, 0, true);
+
+  return new Blob([buffer], { type:"image/tiff" });
+}
+
 async function runConvert(item){
   item.status = "converting";
   renderConvertList();
@@ -1155,6 +1222,10 @@ async function runConvert(item){
       blob = await encodeBMP(canvas);
     } else if(format.ext === "ico"){
       blob = await encodeICO(canvas);
+    } else if(format.ext === "svg"){
+      blob = await encodeSVG(canvas);
+    } else if(format.ext === "tiff"){
+      blob = await encodeTIFF(canvas);
     } else {
       blob = await canvasToBlob(canvas, format.mime);
     }
