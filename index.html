@@ -216,6 +216,14 @@
 
   /* App shell */
   .app-wrap{max-width:1100px; margin:0 auto; padding:0 20px 60px;}
+  .back-link{
+    color:var(--text-dim);
+    font-size:14px;
+    cursor:pointer;
+    padding:16px 4px 12px;
+    text-align:left;
+  }
+  .back-link:hover{color:var(--accent);}
   .toolbar{
     display:flex; align-items:center; justify-content:space-between; gap:12px;
     flex-wrap:wrap;
@@ -385,27 +393,30 @@
 
 <!-- DASHBOARD SCREEN -->
 <div id="dashboard-screen" class="center-wrap hidden">
-  <div class="dashboard-grid">
-    <div class="glass dashboard-card" id="card-server-image">
-      <div class="dashboard-icon">🖼️</div>
-      <div class="dashboard-title">SERVER IMAGE</div>
-      <div class="dashboard-desc">Upload, kelola folder, dan ambil URL gambar kamu.</div>
+  <div style="display:flex; flex-direction:column; align-items:center; gap:20px; width:100%;">
+    <div class="dashboard-grid">
+      <div class="glass dashboard-card" id="card-server-image">
+        <div class="dashboard-icon">🖼️</div>
+        <div class="dashboard-title">SERVER IMAGE</div>
+        <div class="dashboard-desc">Upload, kelola folder, dan ambil URL gambar kamu.</div>
+      </div>
+      <div class="glass dashboard-card" id="card-convert">
+        <div class="dashboard-icon">🔄</div>
+        <div class="dashboard-title">CONVERT</div>
+        <div class="dashboard-desc">Convert format gambar/file. Segera hadir.</div>
+      </div>
     </div>
-    <div class="glass dashboard-card" id="card-convert">
-      <div class="dashboard-icon">🔄</div>
-      <div class="dashboard-title">CONVERT</div>
-      <div class="dashboard-desc">Convert format gambar/file. Segera hadir.</div>
-    </div>
+    <span class="logout-link" id="btn-logout">Keluar</span>
   </div>
 </div>
 
 <!-- CONVERT SCREEN -->
 <div id="convert-screen" class="hidden app-wrap">
+  <div class="back-link" id="btn-convert-to-dashboard">← Kembali</div>
   <div class="glass toolbar">
     <div class="breadcrumb"><span class="current">CONVERT GAMBAR</span></div>
     <div class="toolbar-actions">
       <button class="btn btn-ghost" id="btn-convert-pick">+ Pilih Gambar</button>
-      <span class="logout-link" id="btn-convert-to-dashboard">Dashboard</span>
     </div>
   </div>
 
@@ -448,13 +459,12 @@
 
 <!-- APP SCREEN -->
 <div id="app-screen" class="hidden app-wrap">
+  <div class="back-link" id="btn-to-dashboard">← Kembali</div>
   <div class="glass toolbar">
     <div class="breadcrumb" id="breadcrumb"></div>
     <div class="toolbar-actions">
       <button class="btn btn-ghost" id="btn-new-folder">+ Folder Baru</button>
       <button class="btn btn-ghost" id="btn-pick-upload">Upload Gambar</button>
-      <span class="logout-link" id="btn-to-dashboard">Dashboard</span>
-      <span class="logout-link" id="btn-logout">Keluar</span>
     </div>
   </div>
 
